@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+// import SliderSection from "@/components/SliderSection";
 
 export default function Page() {
-  const [messages, setMessages] = useState<{ text: string; isUser: boolean }[]>([
-    { text: "Hello! I'm your AI assistant. How can I help you today?", isUser: false },
+  const [messages, setMessages] = useState<{ id: string; text: string; isUser: boolean }[]>([
+    { id: "1", text: "Hello! I'm your AI assistant. How can I help you today?", isUser: false },
   ])
   const [inputMessage, setInputMessage] = useState("")
   const [weatherData, setWeatherData] = useState({ temp: "25°C", condition: "Sunny", icon: "sun" })
@@ -19,6 +20,8 @@ export default function Page() {
   const [activeView, setActiveView] = useState<"split" | "chat">("split")
   const [isTyping, setIsTyping] = useState(false)
   const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [address, setAddress] = useState("")
+  const [loading, setLoading] = useState(false)
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
   const toggleTheme = () => {
@@ -28,7 +31,7 @@ export default function Page() {
   const sendMessage = () => {
     if (inputMessage.trim() === "") return
 
-    const newMessages = [...messages, { text: inputMessage, isUser: true }]
+    const newMessages = [...messages, { id: `${Date.now()}`, text: inputMessage, isUser: true }]
 
     setMessages(newMessages)
     setInputMessage("")
@@ -36,7 +39,7 @@ export default function Page() {
 
     // Simulate AI response
     setTimeout(() => {
-      setMessages((prev) => [...prev, { text: getAIResponse(inputMessage), isUser: false }])
+      setMessages((prev) => [...prev, { id: `${Date.now()}`, text: getAIResponse(inputMessage), isUser: false }])
       setIsTyping(false)
     }, 1500)
 
@@ -66,12 +69,48 @@ export default function Page() {
     }
   }
 
+  const fetchWeather = async () => {
+    if (!address.trim()) return;
+
+    setLoading(true);
+    try {
+      const apiKey = "YOUR_API_KEY"; // Replace with your OpenWeatherMap API key
+      const response = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?q=${address}&units=metric&appid=${apiKey}`
+      );
+      const data = await response.json();
+
+      if (data.cod === 200) {
+        const condition = data.weather[0].main;
+        const icon =
+          condition === "Clear"
+            ? "sun"
+            : condition === "Clouds"
+            ? "cloud"
+            : "rain";
+
+        setWeatherData({
+          temp: `${Math.round(data.main.temp)}°C`,
+          condition,
+          icon,
+        });
+      } else {
+        alert("Location not found. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error fetching weather data:", error);
+      alert("Failed to fetch weather data. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Scroll to bottom on initial load
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
     }
-  }, [messages])
+  }, [])
 
   const WeatherIcon = () => {
     switch (weatherData.icon) {
@@ -113,7 +152,7 @@ export default function Page() {
               theme === "dark" ? "border-b border-gray-700" : "border-b border-indigo-100",
             )}
           >
-            <Tabs defaultValue="weather" className="h-full">
+            <Tabs>
               <TabsList
                 className={cn(
                   "w-full grid grid-cols-2 h-14 rounded-none",
@@ -149,7 +188,7 @@ export default function Page() {
                 value="weather"
                 className={cn(
                   "h-[calc(100%-3.5rem)] p-6 flex items-center justify-center",
-                  theme === "dark" ? "bg-gray-800/50" : "bg-white/30 backdrop-blur-sm",
+                  theme === "dark" ? "bg-gray-800/50" : "bg-white/30 backdrop-blur-sm"
                 )}
               >
                 <div
@@ -157,7 +196,7 @@ export default function Page() {
                     "text-center p-8 rounded-xl transition-all",
                     theme === "dark"
                       ? "bg-gray-800 shadow-lg shadow-gray-900/30"
-                      : "bg-white/80 shadow-lg shadow-indigo-200/50",
+                      : "bg-white/80 shadow-lg shadow-indigo-200/50"
                   )}
                 >
                   <WeatherIcon />
@@ -167,30 +206,19 @@ export default function Page() {
                   <p className={cn("text-xl mt-2", theme === "dark" ? "text-gray-300" : "text-indigo-600")}>
                     {weatherData.condition}
                   </p>
-                  <div className="mt-6 flex gap-2 justify-center">
+                  <div className="mt-6 flex flex-col gap-4 items-center">
+                    <Input
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Enter address"
+                      className="w-full max-w-md"
+                    />
                     <Button
-                      size="sm"
-                      variant={theme === "dark" ? "outline" : "default"}
-                      className={theme === "dark" ? "border-gray-600" : ""}
-                      onClick={() => setWeatherData({ temp: "25°C", condition: "Sunny", icon: "sun" })}
+                      onClick={fetchWeather}
+                      disabled={loading}
+                      className="px-6 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
-                      Sunny
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={theme === "dark" ? "outline" : "default"}
-                      className={theme === "dark" ? "border-gray-600" : ""}
-                      onClick={() => setWeatherData({ temp: "18°C", condition: "Cloudy", icon: "cloud" })}
-                    >
-                      Cloudy
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={theme === "dark" ? "outline" : "default"}
-                      className={theme === "dark" ? "border-gray-600" : ""}
-                      onClick={() => setWeatherData({ temp: "15°C", condition: "Rainy", icon: "rain" })}
-                    >
-                      Rainy
+                      {loading ? "Loading..." : "Get Weather"}
                     </Button>
                   </div>
                 </div>
@@ -199,7 +227,7 @@ export default function Page() {
                 value="images"
                 className={cn(
                   "h-[calc(100%-3.5rem)] p-6 flex items-center justify-center",
-                  theme === "dark" ? "bg-gray-800/50" : "bg-white/30 backdrop-blur-sm",
+                  theme === "dark" ? "bg-gray-800/50" : "bg-white/30 backdrop-blur-sm"
                 )}
               >
                 <div
@@ -207,13 +235,13 @@ export default function Page() {
                     "text-center p-8 rounded-xl w-full max-w-md transition-all",
                     theme === "dark"
                       ? "bg-gray-800 shadow-lg shadow-gray-900/30"
-                      : "bg-white/80 shadow-lg shadow-indigo-200/50",
+                      : "bg-white/80 shadow-lg shadow-indigo-200/50"
                   )}
                 >
                   <div
                     className={cn(
                       "rounded-lg p-8 mb-6 border-2 border-dashed flex flex-col items-center justify-center",
-                      theme === "dark" ? "border-gray-700" : "border-indigo-200",
+                      theme === "dark" ? "border-gray-700" : "border-indigo-200"
                     )}
                   >
                     <ImageIcon size={64} className={theme === "dark" ? "text-gray-600" : "text-indigo-300"} />
@@ -223,8 +251,8 @@ export default function Page() {
                   </div>
                   <Button
                     className={cn(
-                      "px-6",
-                      theme === "dark" ? "bg-blue-600 hover:bg-blue-700" : "bg-indigo-600 hover:bg-indigo-700",
+                      "px-6 py-2 rounded-lg",
+                      theme === "dark" ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white"
                     )}
                   >
                     Upload Image
@@ -233,7 +261,6 @@ export default function Page() {
               </TabsContent>
             </Tabs>
           </div>
-
           {/* Toggle Button */}
           <div className="relative">
             <Button
@@ -261,7 +288,7 @@ export default function Page() {
                 chat(with ai)
               </h2>
             </div>
-
+            
             <div
               ref={chatContainerRef}
               className={cn(
@@ -270,7 +297,7 @@ export default function Page() {
               )}
             >
               {messages.map((message, index) => (
-                <div key={index} className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
+                <div key={message.id} className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
                   <div
                     className={cn(
                       "max-w-[80%] p-4 rounded-2xl shadow-md",
@@ -349,8 +376,12 @@ export default function Page() {
               <div className="flex items-center gap-2">
                 <WeatherIcon />
                 <div>
-                  <p className={cn("font-bold", theme === "dark" ? "text-blue-400" : "text-indigo-700")}>weather(C)</p>
-                  <p className={theme === "dark" ? "text-gray-400" : "text-indigo-500"}>{weatherData.temp}</p>
+                  <h2 className={cn("text-4xl font-bold mt-4", theme === "dark" ? "text-gray-100" : "text-indigo-900")}>
+                    {weatherData.temp}
+                  </h2>
+                  <p className={cn("text-xl mt-2", theme === "dark" ? "text-gray-300" : "text-indigo-600")}>
+                    {weatherData.condition}
+                  </p>
                 </div>
               </div>
             </div>
@@ -407,7 +438,7 @@ export default function Page() {
               )}
             >
               {messages.map((message, index) => (
-                <div key={index} className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
+                <div key={message.id} className={`flex ${message.isUser ? "justify-end" : "justify-start"}`}>
                   <div
                     className={cn(
                       "max-w-[80%] p-4 rounded-2xl shadow-md",
@@ -466,6 +497,26 @@ export default function Page() {
                   )}
                 >
                   <Send size={18} />
+                </Button>
+              </div>
+              <div className="mt-4">
+                <Input
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Enter address"
+                  className={cn(
+                    "w-full max-w-md",
+                    theme === "dark" ? "bg-gray-700 text-gray-100" : "bg-white text-gray-800",
+                  )}
+                />
+                <Button
+                  onClick={fetchWeather}
+                  className={cn(
+                    "mt-2 px-6 py-2 rounded-lg",
+                    theme === "dark" ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-indigo-600 hover:bg-indigo-700 text-white",
+                  )}
+                >
+                  Fetch Weather
                 </Button>
               </div>
             </div>
